@@ -1,4 +1,4 @@
-## For Senegal
+# TODO other data: for now we have only ph data
 import io
 import rasterio
 import numpy as np

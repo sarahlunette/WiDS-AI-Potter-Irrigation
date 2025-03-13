@@ -21,6 +21,9 @@ from sentinelsat import SentinelAPI
 from baitsss import evapotranspiration
 from owslib.wcs import WebCoverageService
 import rasterio
+from soilgrid.bbox_computation import compute_bbox
+from soilgrid.get_soil_data import fetch_soil_data
+from weather.weather import get_weather
 
 load_dotenv()
 # Constants ## TODO: put them all in .env 
@@ -31,55 +34,15 @@ SENTINEL_PASSWORD = ''
 
 # OpenWeatherMap API
 # Function to fetch weather data
-def get_weather(lat, lon):
-    url = f"https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&appid={API_KEY}&units=metric"
-
-    response = requests.get(url)
-    
-    if response.status_code == 200:
-        data = response.json()
-        
-        # Extract current weather
-        current_temp = data["current"]["temp"]
-        current_conditions = data["current"]["weather"][0]["description"]
-
-        # Extract daily forecast (8 days)
-        forecast = []
-        for day in data["daily"]:
-            forecast.append({
-                "date": day["dt"],  # Timestamp (convert to date if needed)
-                "temp_min": day["temp"]["min"],
-                "temp_max": day["temp"]["max"],
-                "weather": day["weather"][0]["description"]
-            })
-        
-        return {
-            "current": {
-                "temperature": current_temp,
-                "conditions": current_conditions
-            },
-            "forecast": forecast
-        }
-    
-    else:
-        print(f"Error: {response.status_code}, {response.text}")
-        return None
+def get_weather(lat, lon, API_KEY): # TODO: strange way of inputing API_KEY not sure we need a microservice for this
+    results = get_weather(lat, lon, API_KEY)
+    return results
 
 # SoilGrids API
-def fetch_soil_data(lat, lon):
-    wcs = WebCoverageService(SOILGRIDS_URL, version='1.0.0')
-    params = {"lon": lon, "lat": lat}
-    bbox = (-1784000, 1356000, -1140000, 1863000) # TODO: create the bbox for the patch (another function)
-    response = wcs.getCoverage(
-    identifier='phh2o_0-5cm_mean', 
-    crs='urn:ogc:def:crs:EPSG::152160',
-    bbox=bbox, 
-    resx=250, resy=250, 
-    format='GEOTIFF_INT16')
-    with open('./data/Senegal_pH_0-5_mean.tif', 'wb') as file:
-        file.write(response.read())
-    ph = rasterio.open("./data/Senegal_pH_0-5_mean.tif", driver="GTiff")
-    return response.json() if response.status_code == 200 else None
+def fetch_soil_data(lat, lon, extension=5):
+    bbox = compute_bbox(lat, lon, extension)
+    results = fetch_soil_data(lat, lon, bbox)
+    return results
 
 # Fetching FAO Data (Placeholder for FAO dataset retrieval)
 def fetch_fao_data():
