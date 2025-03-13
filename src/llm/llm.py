@@ -4,9 +4,12 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain.vectorstores import FAISS
 from langchain.embeddings import OpenAIEmbeddings
 
+# TODO: Choose model
+# TODO: get environment variables
 # Load LLM
 llm = ChatOpenAI(model_name="gpt-4", openai_api_key="YOUR_OPENAI_API_KEY")
 
+# TODO: create a pdf database instead of data and use vector store with langchain (gemini ?) for instance
 # Knowledge Base (Water Policies, Past Data)
 data = [
     "Watering is restricted from 10 AM to 6 PM in summer.",
