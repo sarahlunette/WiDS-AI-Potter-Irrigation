@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 '''# Locations for data collection
 LOCATIONS = [
-    {"lat": 48.8566, "lon": 2.3522, "name": "Paris", "extension": 5},
+    {"lat": 48.8566, "lon": 2.3522, "name": "Paris", "extension": 5}, # TODO: modify extension
     {"lat": 37.7749, "lon": -122.4194, "name": "San Francisco", "extension": 5},
     {"lat": 51.5074, "lon": -0.1278, "name": "London", "extension": 5},
     {"lat": 40.7128, "lon": -74.0060, "name": "New York", "extension": 5},
@@ -34,11 +34,11 @@ API_KEY = os.getenv('API_KEY')
 def get_data(LOCATIONS):
     all_data = []
     for location in LOCATIONS:
-        lat, lon, name = location["lat"], location["lon"], location["name"]
+        lat, lon, name, extension = location["lat"], location["lon"], location["name"], location["extension"]
         print(f"Fetching data for {name}...")
 
         weather_owm = get_weather(lat, lon, API_KEY)
-        soil_data = fetch_soil_data(lat, lon, extension=location["extension"])
+        soil_data = fetch_soil_data(lat, lon)
         evapotranspiration_data = fetch_evapotranspiration_data(weather_own['current']['temperature'], humidity)
 
         data_entry = {
