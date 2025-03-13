@@ -3,18 +3,22 @@ import pandas as pd
 import plotly.express as px
 from kafka import KafkaConsumer, KafkaProducer
 import json
+from src.data.weather.weather import get_weather  # Use absolute import
 
 # Kafka Configuration
 KAFKA_BROKER = "localhost:9092"
 SENSOR_TOPIC = "sensor_data"
-FORECAST_TOPIC = "forecast_data" # TODO: enhance data (any kind of forecast)
+FORECAST_TOPIC = "forecast_data"
 COMMAND_TOPIC = "valve_commands"
+
+# Weather API Configuration
+API_KEY = "6a210d4c91e9f455ade17f75196c1a17"  # Replace with your actual API key
 
 # Streamlit App with Multi-Page Navigation
 st.set_page_config(page_title="Smart Irrigation AI Dashboard", layout="wide")
 
 # Sidebar Navigation
-page = st.sidebar.selectbox("Select Page", ["Farmer's Input", "Monitoring Dashboard", "Chatbot"])
+page = st.sidebar.selectbox("Select Page", ["Farmer's Input", "Monitoring Dashboard", "Weather", "Chatbot"])
 
 if page == "Farmer's Input":
     st.title("🚜 Farmer's Input")
@@ -52,7 +56,29 @@ elif page == "Monitoring Dashboard":
     if not df.empty:
         fig = px.line(df[df["sector"] == selected_sensor], x=df.index, y=variable, title=f"{variable} Over Time")
         st.plotly_chart(fig)
+
+elif page == "Weather":
+    st.title("🌤️ Weather Information")
     
+    # Input latitude and longitude
+    lat = st.text_input("Latitude", "37.7749")  # Default to San Francisco latitude
+    lon = st.text_input("Longitude", "-122.4194")  # Default to San Francisco longitude
+    
+    if st.button("Get Weather"):
+        weather_data = get_weather(lat, lon, API_KEY)
+        
+        if weather_data:
+            st.subheader("Current Weather")
+            st.write(f"Temperature: {weather_data['current']['temperature']}°C")
+            st.write(f"Conditions: {weather_data['current']['conditions']}")
+            
+            st.subheader("Next Day Forecast")
+            st.write(f"Min Temperature: {weather_data['next_day']['temperature_min']}°C")
+            st.write(f"Max Temperature: {weather_data['next_day']['temperature_max']}°C")
+            st.write(f"Conditions: {weather_data['next_day']['conditions']}")
+        else:
+            st.error("Failed to retrieve weather data.")
+
 elif page == "Chatbot":
     st.title("💬 AI Chatbot")
     st.write("Ask the AI assistant about irrigation recommendations!")
