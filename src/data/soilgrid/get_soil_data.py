@@ -25,7 +25,7 @@ def fetch_soil_data(lat, lon, extension):
     """
     # Connect to WebCoverageService
     wcs = WebCoverageService(SOILGRIDS_URL, version='1.0.0')
-    bbox = compute_bbox(lat, lon, extension) # TODO: should I put this here or somewhere else
+    bbox = compute_bbox(lat, lon, extension) # TODO: should I put this here or somewhere else (main function ?)
 
     try:
         # Fetch soil data as a GeoTIFF

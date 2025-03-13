@@ -19,7 +19,7 @@ def generate_sensor_data():
         }
         producer.send('sensor_data', value=data)
         print(f"Produced: {data}")
-        time.sleep(900)  # Simulate data generation every 15 minutes
+        time.sleep(2)  # Simulate data generation every 2 seconds (for demonstration purpose) otherwise every 900 seconds = 15 minutes
 
 if __name__ == "__main__":
     generate_sensor_data()
