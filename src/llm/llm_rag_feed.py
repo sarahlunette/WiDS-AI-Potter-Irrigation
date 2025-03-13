@@ -36,7 +36,7 @@ llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY)
 memory = ConversationBufferMemory()
 qa_chain = ConversationalRetrievalChain.from_llm(llm, vector_db.as_retriever(), memory=memory)
 
-# ✅ Step 3: Fetch IoT Sensor Data
+# ✅ Step 3: Fetch IoT Sensor Data # TODO: fetch with kafka
 def get_iot_data():
     try:
         response = requests.get(IOT_API_URL)

@@ -7,7 +7,7 @@ import json
 # Kafka Configuration
 KAFKA_BROKER = "localhost:9092"
 SENSOR_TOPIC = "sensor_data"
-FORECAST_TOPIC = "forecast_data"
+FORECAST_TOPIC = "forecast_data" # TODO: enhance data (any kind of forecast)
 COMMAND_TOPIC = "valve_commands"
 
 # Streamlit App with Multi-Page Navigation

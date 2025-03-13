@@ -50,3 +50,5 @@ def train_gan(generator, discriminator, epochs=1000, batch_size=32):
 generator = build_generator()
 discriminator = build_discriminator()
 train_gan(generator, discriminator)
+
+# TODO: SAve model somewhere

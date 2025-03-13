@@ -71,6 +71,8 @@ env = DummyVecEnv([lambda: IrrigationEnv(num_sectors=2)])
 model = PPO("MlpPolicy", env, verbose=1)
 model.learn(total_timesteps=10000)
 
+# TODO: save model
+
 # Predict best irrigation action
 obs = env.reset()
 action, _ = model.predict(obs)

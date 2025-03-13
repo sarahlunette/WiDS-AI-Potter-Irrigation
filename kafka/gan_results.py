@@ -46,7 +46,7 @@ def generate_forecast(sensor_data):
 
     return {"forecast_irrigation": f"{prediction:.1f} mm", "confidence": 0.95}  # Score fictif
 
-@app.post("/forecast-irrigation")
+@app.post("/forecast-irrigation") # TODO: not sure it is useful to use kafka for this forecast
 def forecast_irrigation(data: dict):
     """
     Reçoit les données du fermier, météo, sol et capteurs et retourne une prévision GAN.
