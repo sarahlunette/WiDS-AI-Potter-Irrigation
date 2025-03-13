@@ -1,0 +1,5 @@
+streamlit
+plotly
+plotly-express
+kafka-python
+pandas
