@@ -18,12 +18,12 @@ import pandas as pd
 import os
 from dotenv import load_dotenv
 from sentinelsat import SentinelAPI
-from baitsss import evapotranspiration
 from owslib.wcs import WebCoverageService
 import rasterio
 from soilgrid.bbox_computation import compute_bbox
 from soilgrid.get_soil_data import fetch_soil_data
 from weather.weather import get_weather
+from evapotranspiration.get_evapotranspiration import fetch_evapotranspiration_data
 
 load_dotenv()
 # Constants ## TODO: put them all in .env 
@@ -44,7 +44,7 @@ def fetch_soil_data(lat, lon, extension=5):
     results = fetch_soil_data(lat, lon, bbox)
     return results
 
-# Fetching FAO Data (Placeholder for FAO dataset retrieval)
+'''# Fetching FAO Data (Placeholder for FAO dataset retrieval)
 def fetch_fao_data():
     fao_data = pd.read_csv("FAO_dataset.csv")  # Assuming local storage or API access
     return fao_data
@@ -56,8 +56,8 @@ def fetch_copernicus_data():
                         platformname="Sentinel-2",
                         date=("NOW-7DAYS", "NOW"),
                         cloudcoverpercentage=(0, 30))
-    return products
+    return products'''
 
-def fetch_evapotranspiration_data(solar_radiation, temperature, humidity):
-    evapo_rate = evapotranspiration(solar_radiation, temperature, humidity)
+def fetch_evapo_data(solar_radiation, temperature, humidity):
+    evapo_rate = fetch_evapotranspiration_data(solar_radiation, temperature, humidity)
     return evapo_rate

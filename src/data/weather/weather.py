@@ -1,7 +1,9 @@
 import requests
 from datetime import datetime, timedelta
+# TODO: add other data (such as wind speed, pressure) # Look at paper
+# {'coord': {'lon': -122.4194, 'lat': 37.7749}, 'weather': [{'id': 800, 'main': 'Clear', 'description': 'clear sky', 'icon': '01d'}], 'base': 'stations', 'main': {'temp': 11.95, 'feels_like': 10.85, 'temp_min': 10.34, 'temp_max': 13.58, 'pressure': 1012, 'humidity': 63, 'sea_level': 1012, 'grnd_level': 1008}, 'visibility': 10000, 'wind': {'speed': 7.6, 'deg': 295, 'gust': 12.07}, 'clouds': {'all': 8}, 'dt': 1741901588, 'sys': {'type': 2, 'id': 2017837, 'country': 'US', 'sunrise': 1741875801, 'sunset': 1741918493}, 'timezone': -25200, 'id': 5391959, 'name': 'San Francisco', 'cod': 200}
 
-def get_weather(lat, lon, API_KEY):
+def get_weather(lat, lon, API_KEY): # TODO: don't know if API_KEY should be a variable
     # Using the Current Weather Data API which is available for free accounts
     current_url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API_KEY}&units=metric"
     
@@ -18,6 +20,7 @@ def get_weather(lat, lon, API_KEY):
         # Extract current weather
         current_temp = current_data["main"]["temp"]
         current_conditions = current_data["weather"][0]["description"]
+        current_humidity = current_data["main"]["humidity"]
         
         # Extract next day's forecast
         next_day = datetime.utcnow() + timedelta(days=1)
@@ -38,7 +41,9 @@ def get_weather(lat, lon, API_KEY):
         return {
             "current": {
                 "temperature": current_temp,
-                "conditions": current_conditions
+                "conditions": current_conditions,
+                "humidity": current_humidity,
+
             },
             "next_day": {
                 "temperature_min": next_day_temp_min,

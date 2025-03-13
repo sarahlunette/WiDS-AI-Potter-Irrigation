@@ -12,7 +12,7 @@ if weather_data:
     print("Current Weather:")
     print(f"Temperature: {weather_data['current']['temperature']}°C")
     print(f"Conditions: {weather_data['current']['conditions']}")
-    
+    print(f"Humidity: {weather_data['current']['humidity']}%")
     print("\nNext Day Forecast:")
     print(f"Min Temperature: {weather_data['next_day']['temperature_min']}°C")
     print(f"Max Temperature: {weather_data['next_day']['temperature_max']}°C")

@@ -6,11 +6,12 @@ import matplotlib.pyplot as plt
 from rasterio.io import MemoryFile
 from rasterio import plot
 from owslib.wcs import WebCoverageService
+from soilgrid.bbox_computation import compute_bbox
 
 # Define the SoilGrids WCS URL
 SOILGRIDS_URL = "https://maps.isric.org/mapserv?map=/map/phh2o.map"
 
-def fetch_soil_data(lat, lon, bbox):
+def fetch_soil_data(lat, lon, extension):
     """
     Fetches soil pH data for a given coordinate using WCS (Web Coverage Service).
     
@@ -24,6 +25,7 @@ def fetch_soil_data(lat, lon, bbox):
     """
     # Connect to WebCoverageService
     wcs = WebCoverageService(SOILGRIDS_URL, version='1.0.0')
+    bbox = compute_bbox(lat, lon, extension) # TODO: should I put this here or somewhere else
 
     try:
         # Fetch soil data as a GeoTIFF
