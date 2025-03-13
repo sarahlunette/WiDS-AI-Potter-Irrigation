@@ -4,7 +4,7 @@
 import requests
 import pandas as pd
 import time
-from src.fetch_data import fetch_weather_data, fetch_weatherstack_data, fetch_soil_data, fetch_fao_data, fetch_copernicus_data, fetch_evapotranspiration_data
+from fetch_data import fetch_weather_data, fetch_weatherstack_data, fetch_soil_data, fetch_fao_data, fetch_copernicus_data, fetch_evapotranspiration_data
 
 # Locations for data collection
 LOCATIONS = [
