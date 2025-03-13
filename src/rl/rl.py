@@ -5,6 +5,8 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.envs import DummyVecEnv
 from gymnasium.spaces import Box
 
+# TODO: remove the functions and import them from the right scripts
+# TODO: get iot_sensor_data from kafka (create pipeline)
 # API for weather data
 def get_weather_forecast(lat, lon):
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,soil_moisture"

@@ -39,7 +39,7 @@ def main():
 
     df = pd.DataFrame(all_data)
     df.to_csv("irrigation_data.csv", index=False)
-    print("Data collection complete. Saved as 'irrigation_data.csv'.")
+    return df
 
 if __name__ == "__main__":
     main()

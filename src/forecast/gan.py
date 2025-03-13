@@ -3,6 +3,8 @@ import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LeakyReLU
 
+# TODO: complexify models
+
 # Generator Model
 def build_generator():
     model = Sequential([
