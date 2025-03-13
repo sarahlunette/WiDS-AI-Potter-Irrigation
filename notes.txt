@@ -42,3 +42,5 @@ Scalability – RL and GAN models may have different computational needs.
 Independent Deployment – If RL runs in real-time and GAN processes batch forecasts, keeping them separate avoids bottlenecks.
 Resilience – If one model fails, the other remains operational.
 Optimized Resources – The RL API can be lightweight, while the GAN API might require a GPU.
+
+Access token: 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

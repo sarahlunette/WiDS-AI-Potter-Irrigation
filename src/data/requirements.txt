@@ -1,0 +1,6 @@
+rasterio
+pandas
+requests
+sentinelsat
+baitsss
+wslib

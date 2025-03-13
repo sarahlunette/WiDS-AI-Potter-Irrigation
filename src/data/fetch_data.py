@@ -15,35 +15,70 @@
 
 import requests
 import pandas as pd
-import dotenv # TODO: get environment variables API keys
+import os
+from dotenv import load_dotenv
 from sentinelsat import SentinelAPI
 from baitsss import evapotranspiration
+from owslib.wcs import WebCoverageService
+import rasterio
 
+load_dotenv()
 # Constants ## TODO: put them all in .env 
-OWM_API_KEY = "your_api_key"
-OWM_URL = "https://api.openweathermap.org/data/2.5/weather"
-WEATHERSTACK_API_KEY = "your_api_key"
-WEATHERSTACK_URL = "http://api.weatherstack.com/current"
-SOILGRIDS_URL = "https://rest.soilgrids.org/query"
+OWM_API_KEY = os.getenv("OWM_API_KEY")
+SOILGRIDS_URL = "http://maps.isric.org/mapserv?map=/map/phh2o.map"
 SENTINEL_USERNAME = ''
 SENTINEL_PASSWORD = ''
 
 # OpenWeatherMap API
-def fetch_weather_data(lat, lon):
-    params = {"lat": lat, "lon": lon, "appid": OWM_API_KEY, "units": "metric"}
-    response = requests.get(OWM_URL, params=params)
-    return response.json() if response.status_code == 200 else None
+# Function to fetch weather data
+def get_weather(lat, lon):
+    url = f"https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&appid={API_KEY}&units=metric"
 
-# Weatherstack API
-def fetch_weatherstack_data(location):
-    params = {"access_key": WEATHERSTACK_API_KEY, "query": location}
-    response = requests.get(WEATHERSTACK_URL, params=params)
-    return response.json() if response.status_code == 200 else None
+    response = requests.get(url)
+    
+    if response.status_code == 200:
+        data = response.json()
+        
+        # Extract current weather
+        current_temp = data["current"]["temp"]
+        current_conditions = data["current"]["weather"][0]["description"]
+
+        # Extract daily forecast (8 days)
+        forecast = []
+        for day in data["daily"]:
+            forecast.append({
+                "date": day["dt"],  # Timestamp (convert to date if needed)
+                "temp_min": day["temp"]["min"],
+                "temp_max": day["temp"]["max"],
+                "weather": day["weather"][0]["description"]
+            })
+        
+        return {
+            "current": {
+                "temperature": current_temp,
+                "conditions": current_conditions
+            },
+            "forecast": forecast
+        }
+    
+    else:
+        print(f"Error: {response.status_code}, {response.text}")
+        return None
 
 # SoilGrids API
 def fetch_soil_data(lat, lon):
+    wcs = WebCoverageService(SOILGRIDS_URL, version='1.0.0')
     params = {"lon": lon, "lat": lat}
-    response = requests.get(SOILGRIDS_URL, params=params)
+    bbox = (-1784000, 1356000, -1140000, 1863000) # TODO: create the bbox for the patch (another function)
+    response = wcs.getCoverage(
+    identifier='phh2o_0-5cm_mean', 
+    crs='urn:ogc:def:crs:EPSG::152160',
+    bbox=bbox, 
+    resx=250, resy=250, 
+    format='GEOTIFF_INT16')
+    with open('./data/Senegal_pH_0-5_mean.tif', 'wb') as file:
+        file.write(response.read())
+    ph = rasterio.open("./data/Senegal_pH_0-5_mean.tif", driver="GTiff")
     return response.json() if response.status_code == 200 else None
 
 # Fetching FAO Data (Placeholder for FAO dataset retrieval)
