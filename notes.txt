@@ -14,7 +14,7 @@ Data cleaning: Handling missing values and normalizing inputs
 
 3️⃣ AI Model Training
 Reinforcement Learning (RL) for irrigation control
-GANs for forecasting drought & water price
+GANs for forecasting drought & water price (help farmers make scenarios for if less watering for instance (as well))
 LLM + RAG for explainable AI
 
 4️⃣ Deployment
@@ -34,3 +34,11 @@ Split work
 Deploy airflow ?
 Should we use dagshub ?
 Look at what models we want to use
+Prepare for presentation questions (culture)
+
+Yes, splitting into two separate APIs on different servers makes sense if you want:
+
+Scalability – RL and GAN models may have different computational needs.
+Independent Deployment – If RL runs in real-time and GAN processes batch forecasts, keeping them separate avoids bottlenecks.
+Resilience – If one model fails, the other remains operational.
+Optimized Resources – The RL API can be lightweight, while the GAN API might require a GPU.

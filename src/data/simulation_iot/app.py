@@ -1,9 +1,11 @@
-from flask import Flask, jsonify
+# Second way of generating sensor data
+from fastapi import FastAPI
+from pydantic import BaseModel
 import random
 import time
 import threading
 
-app = Flask(__name__)
+app = FastAPI()
 
 # Simulated IoT Data (Global)
 iot_data = {
@@ -14,7 +16,7 @@ iot_data = {
     "valve_status": "closed"  # open/closed
 }
 
-# ✅ Function to Simulate Sensor Updates
+# Function to Simulate Sensor Updates
 def update_sensor_data():
     while True:
         iot_data["moisture"] = round(random.uniform(20, 40), 1)  # Soil moisture (20-40%)
@@ -23,14 +25,10 @@ def update_sensor_data():
         iot_data["valve_status"] = "open" if iot_data["moisture"] < 25 else "closed"  # Auto valve control
         time.sleep(10)  # Update every 10 sec
 
-# ✅ API Route for IoT Data
-@app.route('/sensor_data', methods=['GET'])
-def get_sensor_data():
-    return jsonify(iot_data)
-
-# ✅ Start Background Sensor Updates
+# Background thread to update sensor data
 threading.Thread(target=update_sensor_data, daemon=True).start()
 
-# ✅ Run Flask Server
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)
+# API Route for IoT Data
+@app.get("/sensor_data")
+def get_sensor_data():
+    return iot_data

@@ -1,23 +1,25 @@
 from kafka import KafkaProducer
-import json
-import time
 import random
+import time
+import json
 
+# Kafka Producer Configuration
 producer = KafkaProducer(
-    bootstrap_servers="localhost:9092",
-    value_serializer=lambda v: json.dumps(v).encode("utf-8")
+    bootstrap_servers='localhost:9092',
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
 def generate_sensor_data():
-    return {
-        "sector": random.choice(["A", "B"]),
-        "temperature": round(random.uniform(15, 35), 2),
-        "soil_moisture": round(random.uniform(20, 60), 2),
-        "timestamp": time.time()
-    }
+    while True:
+        data = {
+            "sector": "Vineyard A",
+            "soil_moisture": round(random.uniform(20, 40), 1),  # Soil moisture (20-40%)
+            "temperature": round(random.uniform(15, 35), 1),    # Temperature (15-35°C)
+            "humidity": round(random.uniform(40, 80), 1)        # Humidity (40-80%)
+        }
+        producer.send('sensor_data', value=data)
+        print(f"Produced: {data}")
+        time.sleep(2)  # Simulate data generation every 2 seconds
 
-while True:
-    data = generate_sensor_data()
-    producer.send("sensor_data", value=data)
-    print(f"Sent: {data}")
-    time.sleep(5)  # Send data every 5 seconds
+if __name__ == "__main__":
+    generate_sensor_data()
