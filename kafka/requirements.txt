@@ -1,1 +1,4 @@
 kafka-python
+streamlit
+pandas
+plotly
