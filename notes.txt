@@ -1,0 +1,31 @@
+Smart Irrigation AI Pipeline
+
+1️⃣ Data Acquisition
+We’ll pull data from:
+Weather APIs (OpenWeatherMap, Weatherstack)
+Soil Data APIs (SoilGrids)
+Satellite & Agricultural Data (FAO, Copernicus)
+
+2️⃣ Data Processing
+Feature engineering: Soil moisture, evapotranspiration, drought conditions
+Data fusion: Combining sensor data with weather and soil properties
+Data cleaning: Handling missing values and normalizing inputs
+
+3️⃣ AI Model Training
+Reinforcement Learning (RL) for irrigation control
+GANs for forecasting drought & water price
+LLM + RAG for explainable AI
+
+4️⃣ Deployment
+Autonomous control via IoT
+Farmer dashboard (UI + chatbot)
+API to fetch real-time irrigation recommendations
+
+
+TODOs:
+Black
+Relative paths
+Constants
+Make sure all works
+Enhance app
+Enhance streamlit
