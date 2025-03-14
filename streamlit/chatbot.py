@@ -57,7 +57,7 @@ hf_pipeline = pipeline(
     tokenizer=tokenizer,
     torch_dtype=torch.float16,
     device_map="auto",
-    max_length=512
+    max_new_tokens=100  # Adjust this based on desired output length
 )
 
 # Wrap in LangChain-compatible LLM
