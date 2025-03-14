@@ -29,7 +29,7 @@ LOCATIONS = [
 
 load_dotenv()
 
-API_KEY = os.getenv('API_KEY')
+API_KEY = os.getenv('OWM_API_KEY')
 
 def get_data(LOCATIONS):
     all_data = []
@@ -38,16 +38,16 @@ def get_data(LOCATIONS):
         print(f"Fetching data for {name}...")
 
         weather_owm = get_weather(lat, lon, API_KEY)
-        soil_data = fetch_soil_data(lat, lon)
-        evapotranspiration_data = fetch_evapotranspiration_data(weather_own['current']['temperature'], humidity)
-
+        # soil_data = fetch_soil_data(lat, lon, extension)
+        evapotranspiration_data = fetch_evapotranspiration_data(weather_owm['current']['temperature'], lat) # TODO: add humidity in hargreaves calculation
         data_entry = {
             "location": name,
             "lat": lat,
             "lon": lon,
-            "temperature": weather_owm["main"]["temp"] if weather_owm else None,
-            "humidity": weather_owm["main"]["humidity"] if weather_owm else None,
-            "soil_ph": soil_data["properties"]["phh2o"] if soil_data else None
+            "temperature": weather_owm["current"]["temperature"] if weather_owm else None,
+            # "humidity": weather_owm["current"]["humidity"] if weather_owm else None, TODO: get sensor humidity and location humidity ?
+            "evapotranspiration": evapotranspiration_data if evapotranspiration_data else None,
+            # "soil_ph": soil_data["properties"]["phh2o"].mean() if soil_data else None
         }
         all_data.append(data_entry)
         time.sleep(1)  # Avoid hitting API limits
@@ -56,3 +56,4 @@ def get_data(LOCATIONS):
     # TODO: to DB
     return df
 
+get_data([{"lat": 48.8566, "lon": 2.3522, "name": "Paris", "extension": 5}])
