@@ -1,5 +1,8 @@
+import os
+import json
 import torch
 import streamlit as st
+from kafka import KafkaConsumer
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from langchain_community.llms import HuggingFacePipeline
 from langchain.chains import ConversationalRetrievalChain
@@ -8,47 +11,47 @@ from langchain.vectorstores import FAISS
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-import os
+from src.websearch.search_engine import get_web_results  # Web search API
+from src.forecast.generate_forecast import generate_forecast  # GAN Forecasting
+from src.llm.llm_rag_feed import get_weather  # Import weather function
 
-# === 1️⃣ Load Gemma Model ===
+# === 1️⃣ Load Environment Variables ===
+KAFKA_BROKER = "localhost:9092"
+ENRICHED_DATA_TOPIC = "enriched_data_topic"
+VECTOR_DB_PATH = "vectorstore/index"
+PDF_FOLDER_PATH = "/Users/sarahlenet/Desktop/WiDS-AI-Potter-Irrigation/data/llm/documents"
+
+# === 2️⃣ Load Gemma Model ===
 @st.cache_resource()
 def load_gemma_model():
     model_id = "google/gemma-2b"
-    
-    # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_id)
-    
-    # Load model with optimized settings
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         torch_dtype=torch.float16,
         device_map="auto"
     )
-    
     return tokenizer, model
 
-# === 2️⃣ Load PDFs and Store in FAISS ===
+# === 3️⃣ Load PDFs and Store in FAISS ===
 @st.cache_resource()
 def load_pdfs_to_vectorstore(pdf_folder):
     documents = []
-    
     for pdf_file in os.listdir(pdf_folder):
         if pdf_file.endswith(".pdf"):
             pdf_loader = PyPDFLoader(os.path.join(pdf_folder, pdf_file))
             documents.extend(pdf_loader.load())
-
-    # Split the documents into chunks
+    
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=100)
     texts = text_splitter.split_documents(documents)
-    
-    # Convert to embeddings
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     vector_db = FAISS.from_documents(texts, embeddings)
-    
     return vector_db
 
-# === 3️⃣ Initialize Model and Vector Store ===
+# === 4️⃣ Initialize Model and Vector Store ===
 tokenizer, model = load_gemma_model()
+vector_db = load_pdfs_to_vectorstore(PDF_FOLDER_PATH)
+memory = ConversationBufferMemory()
 
 # Create a pipeline for text generation
 hf_pipeline = pipeline(
@@ -57,47 +60,63 @@ hf_pipeline = pipeline(
     tokenizer=tokenizer,
     torch_dtype=torch.float16,
     device_map="auto",
-    max_new_tokens=100  # Adjust this based on desired output length
+    max_new_tokens=100
 )
 
-# Wrap in LangChain-compatible LLM
 llm = HuggingFacePipeline(pipeline=hf_pipeline)
 
-vector_db = load_pdfs_to_vectorstore("/Users/sarahlenet/Desktop/WiDS-AI-Potter-Irrigation/data/llm/documents/")
-memory = ConversationBufferMemory()
-
-# === 4️⃣ Create the Conversational Chain ===
+# === 5️⃣ Create the Conversational Chain ===
 qa_chain = ConversationalRetrievalChain.from_llm(llm, vector_db.as_retriever(), memory=memory)
 
-# === 5️⃣ Chatbot Function ===
-chat_history = []  # Store conversation history
+# === 6️⃣ Custom RAG Query Function ===
+def custom_rag_query(sensor_data):
+    weather_data = get_weather(sensor_data.get("location", "Bordeaux"))
+    forecast_data = generate_forecast(sensor_data)
+    web_results = get_web_results("irrigation best practices")
+    
+    external_context = f"""
+    📡 **Current Sensor Data:**
+    - Sector: {sensor_data.get("sector", "Unknown")}
+    - Soil Moisture: {sensor_data.get("soil_moisture", "N/A")}%
+    - Temperature: {sensor_data.get("temperature", "N/A")}°C
+    - Humidity: {sensor_data.get("humidity", "N/A")}%
 
-def chat_with_gemma(question):
-    global chat_history
+    🌦 **Current Weather:**
+    - Temperature: {weather_data.get("temperature", "N/A")}°C
+    - Humidity: {weather_data.get("humidity", "N/A")}%
+    - Conditions: {weather_data.get("conditions", "N/A")}
 
-    # Invoke the QA chain with question & history
-    response = qa_chain.invoke({"question": question, "chat_history": chat_history})
+    🔮 **Forecast Data (GAN Prediction):**
+    - Predicted Irrigation: {forecast_data.get("predicted_irrigation", "N/A")}
+    """
+    
+    response = qa_chain.run(external_context)
+    return response
 
-    # Update history
-    chat_history.append((question, response["answer"]))
+# === 7️⃣ Kafka Consumer for Real-Time Data ===
+def consume_kafka_messages():
+    consumer = KafkaConsumer(
+        ENRICHED_DATA_TOPIC,
+        bootstrap_servers=KAFKA_BROKER,
+        value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+    )
+    for message in consumer:
+        return message.value  # Get latest sensor data
 
-    return response["answer"]
+# === 8️⃣ Streamlit Chat Interface ===
+st.title("🤖 Smart Irrigation Chatbot with Gemma & FAISS")
+st.write("Ask about irrigation, weather, and farming recommendations!")
 
-# === 6️⃣ Streamlit Chat Interface ===
-st.title("🤖 Gemma Chatbot with Document Retrieval")
+# Display real-time sensor data from Kafka
+sensor_data = consume_kafka_messages()
+if sensor_data:
+    st.write("📡 Latest Sensor Data:", sensor_data)
+    response = custom_rag_query(sensor_data)
+    st.write("🤖 AI Response:", response)
 
-# Initialize session state for chat history
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-user_input = st.text_input("Ask a question:")
-
+# User manual query input
+user_input = st.text_input("Enter your query:")
 if user_input:
-    response = chat_with_gemma(user_input)
-    st.session_state.chat_history.append(("You", user_input))
-    st.session_state.chat_history.append(("Gemma", response))
-
-# Display chat history
-for sender, message in st.session_state.chat_history:
-    st.text(f"{sender}: {message}")
-
+    manual_sensor_data = {"location": "Bordeaux", "sector": "Vineyard", "soil_moisture": 30, "temperature": 22, "humidity": 60}
+    response = custom_rag_query(manual_sensor_data)
+    st.write("🤖 AI Response:", response)
