@@ -3,7 +3,8 @@ import pandas as pd
 import plotly.express as px
 from kafka import KafkaConsumer, KafkaProducer
 import json
-from src.data.weather.weather import get_weather  # Use absolute import
+from src.data.weather.weather import get_weather
+from src.inference import run_algorithm  # Import the algorithm
 
 # Kafka Configuration
 KAFKA_BROKER = "localhost:9092"
@@ -17,6 +18,27 @@ API_KEY = "6a210d4c91e9f455ade17f75196c1a17"  # Replace with your actual API key
 # Streamlit App with Multi-Page Navigation
 st.set_page_config(page_title="Smart Irrigation AI Dashboard", layout="wide")
 
+def fetch_data(lat, lon, api_key, soil_moisture, irrigation_schedule, manual_notes):
+    # Fetch weather data
+    weather_data = get_weather(lat, lon, api_key)
+    
+    if weather_data:
+        # Combine weather data with other inputs
+        data = {
+            "soil_moisture": soil_moisture,
+            "irrigation_schedule": irrigation_schedule,
+            "manual_notes": manual_notes,
+            "current_temperature": weather_data['current']['temperature'],
+            "current_conditions": weather_data['current']['conditions'],
+            "next_day_temperature_min": weather_data['next_day']['temperature_min'],
+            "next_day_temperature_max": weather_data['next_day']['temperature_max'],
+            "next_day_conditions": weather_data['next_day']['conditions']
+        }
+        return data
+    else:
+        st.error("Failed to retrieve weather data.")
+        return None
+
 # Sidebar Navigation
 page = st.sidebar.selectbox("Select Page", ["Farmer's Input", "Monitoring Dashboard", "Weather", "Chatbot"])
 
@@ -28,8 +50,15 @@ if page == "Farmer's Input":
     irrigation_schedule = st.selectbox("Irrigation Schedule", ["Morning", "Afternoon", "Evening"])
     manual_notes = st.text_area("Additional Notes")
     
+    lat = st.text_input("Latitude", "37.7749")  # Default to San Francisco latitude
+    lon = st.text_input("Longitude", "-122.4194")  # Default to San Francisco longitude
+    
     if st.button("Submit Data"):
-        st.success("Data submitted successfully!")
+        data = fetch_data(lat, lon, API_KEY, soil_moisture, irrigation_schedule, manual_notes)
+        if data:
+            result = run_algorithm(data)  # Call the algorithm with the combined data
+            st.success("Data submitted successfully!")
+            st.json(result)
 
 elif page == "Monitoring Dashboard":
     st.title("📊 Monitoring Dashboard")
