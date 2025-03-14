@@ -7,3 +7,6 @@ pypdf
 openai
 tiktoken
 transformers
+sentence-transformers
+tf-keras
+accelerate>=0.26.0

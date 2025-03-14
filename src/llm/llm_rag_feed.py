@@ -2,11 +2,11 @@ import os
 import sys
 import requests
 import json
-from langchain.chat_models import ChatOpenAI
+from langchain.llms import Ollama  # Use Gemma model from Ollama
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain.vectorstores import FAISS
-from langchain.embeddings import OpenAIEmbeddings
+from langchain.embeddings import HuggingFaceEmbeddings  # Offline Embeddings
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from kafka import KafkaConsumer
@@ -17,7 +17,6 @@ from src.forecast.generate_forecast import generate_forecast  # GAN Forecasting
 sys.path.append(os.path.abspath('..'))
 
 # Load environment variables
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OWM_API_KEY = os.getenv("OWM_API_KEY")
 
 ENRICHED_DATA_TOPIC = "enriched_data_topic"
@@ -34,13 +33,14 @@ def load_pdfs_to_vectorstore(pdf_folder):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     split_docs = text_splitter.split_documents(documents)
     
-    vector_db = FAISS.from_documents(split_docs, OpenAIEmbeddings())
+    embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    vector_db = FAISS.from_documents(split_docs, embedding_model)
     return vector_db
 
-vector_db = load_pdfs_to_vectorstore("/Users/sarahlenet/Desktop/WiDS-AI-Potter-Irrigation/data/llm/documents") # TODO: Change path
+vector_db = load_pdfs_to_vectorstore("/Users/sarahlenet/Desktop/WiDS-AI-Potter-Irrigation/data/llm/documents/") # TODO: Change path
 
 # ✅ Step 2: Load AI Model & Memory
-llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)
+llm = Ollama(model="gemma:2b")  # Using Gemma model offline
 memory = ConversationBufferMemory()
 qa_chain = ConversationalRetrievalChain.from_llm(llm, vector_db.as_retriever(), memory=memory)
 

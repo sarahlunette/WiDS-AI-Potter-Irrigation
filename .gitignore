@@ -1,2 +1,4 @@
 tokens
 .env
+streamlit/models_cache
+streamlit/vectorstore
