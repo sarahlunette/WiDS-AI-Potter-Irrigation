@@ -11,6 +11,8 @@ from langchain.vectorstores import FAISS
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+import sys
+sys.path.append(os.path.abspath('..'))
 from src.websearch.search_engine import get_web_results  # Web search API
 from src.forecast.generate_forecast import generate_forecast  # GAN Forecasting
 from src.llm.llm_rag_feed import get_weather  # Import weather function
