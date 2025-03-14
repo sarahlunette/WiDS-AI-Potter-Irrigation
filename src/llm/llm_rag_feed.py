@@ -1,4 +1,5 @@
 import os
+import sys
 import requests
 import json
 from langchain.chat_models import ChatOpenAI
@@ -8,20 +9,27 @@ from langchain.vectorstores import FAISS
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from kafka import KafkaConsumer
+from src.websearch.search_engine import get_web_results  # Web search API
+from src.forecast.generate_forecast import generate_forecast  # GAN Forecasting
+
+# Add parent directory to sys.path
+sys.path.append(os.path.abspath('..'))
 
 # Load environment variables
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+OWM_API_KEY = os.getenv("OWM_API_KEY")
 
-IOT_API_URL = "http://localhost:5000/sensor_data"  # IoT API (replace with real)
-WEATHER_API_URL = "http://api.openweathermap.org/data/2.5/weather"
-PAST_WEATHER_API = "http://localhost:5001/past_weather"  # GAN model past data
-FORECAST_API = "http://localhost:5002/weather_forecast"  # GAN forecast system
+ENRICHED_DATA_TOPIC = "enriched_data_topic"
+KAFKA_BROKER = "localhost:9092"
 
 # ✅ Step 1: Load PDFs into FAISS VectorDB
-def load_pdf_to_vectorstore(pdf_path):
-    pdf_loader = PyPDFLoader(pdf_path)
-    documents = pdf_loader.load()
+def load_pdfs_to_vectorstore(pdf_folder):
+    documents = []
+    for pdf_file in os.listdir(pdf_folder):
+        if pdf_file.endswith(".pdf"):
+            pdf_loader = PyPDFLoader(os.path.join(pdf_folder, pdf_file))
+            documents.extend(pdf_loader.load())
     
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     split_docs = text_splitter.split_documents(documents)
@@ -29,28 +37,32 @@ def load_pdf_to_vectorstore(pdf_path):
     vector_db = FAISS.from_documents(split_docs, OpenAIEmbeddings())
     return vector_db
 
-vector_db = load_pdf_to_vectorstore("water_policies.pdf")
+vector_db = load_pdfs_to_vectorstore("/Users/sarahlenet/Desktop/WiDS-AI-Potter-Irrigation/data/llm/documents") # TODO: Change path
 
 # ✅ Step 2: Load AI Model & Memory
-llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY)
+llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)
 memory = ConversationBufferMemory()
 qa_chain = ConversationalRetrievalChain.from_llm(llm, vector_db.as_retriever(), memory=memory)
 
-# ✅ Step 3: Fetch IoT Sensor Data # TODO: fetch with kafka
-def get_iot_data():
-    try:
-        response = requests.get(IOT_API_URL)
-        if response.status_code == 200:
-            return response.json()
-    except Exception as e:
-        print(f"IoT API Error: {e}")
-    return {}
+# ✅ Step 3: Kafka Consumer Setup
+def consume_kafka_messages():
+    consumer = KafkaConsumer(
+        ENRICHED_DATA_TOPIC,
+        bootstrap_servers=KAFKA_BROKER,
+        value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+    )
+    
+    for message in consumer:
+        sensor_data = message.value
+        print(f"Received Sensor Data: {sensor_data}")
+        response = custom_rag_query(sensor_data)
+        print(f"🤖 AI Response: {response}")
 
 # ✅ Step 4: Fetch Current Weather Data
 def get_weather(city="Bordeaux"):
-    params = {"q": city, "appid": WEATHER_API_KEY, "units": "metric"}
+    params = {"q": city, "appid": OWM_API_KEY, "units": "metric"}
     try:
-        response = requests.get(WEATHER_API_URL, params=params)
+        response = requests.get("http://api.openweathermap.org/data/2.5/weather", params=params)
         if response.status_code == 200:
             weather_data = response.json()
             return {
@@ -62,69 +74,45 @@ def get_weather(city="Bordeaux"):
         print(f"Weather API Error: {e}")
     return {}
 
-# ✅ Step 5: Fetch Past Weather Data (from GAN System)
-def get_past_weather():
-    try:
-        response = requests.get(PAST_WEATHER_API)
-        if response.status_code == 200:
-            return response.json()  # Expected: {"temp_avg": 25.1, "rain_avg": 3.2, "humidity_avg": 65}
-    except Exception as e:
-        print(f"Past Weather API Error: {e}")
-    return {}
+# ✅ Step 5: Fetch Irrigation Forecast Data (from GAN System)
+def get_forecast(sensor_data):
+    return generate_forecast(sensor_data)
 
-# ✅ Step 6: Fetch Weather Forecast Data (from GAN System)
-def get_forecast():
-    try:
-        response = requests.get(FORECAST_API)
-        if response.status_code == 200:
-            return response.json()  # Expected: {"temp_pred": 28.4, "rain_pred": 5.0, "humidity_pred": 60}
-    except Exception as e:
-        print(f"Forecast API Error: {e}")
-    return {}
-
-# ✅ Step 7: Process Query with RAG + External Data
-def custom_rag_query(user_query):
-    # Get real-time data
-    iot_data = get_iot_data()
-    weather_data = get_weather()
-    past_weather = get_past_weather()
-    forecast_data = get_forecast()
-
-    # Construct dynamic context
+# ✅ Step 6: Process Query with RAG + External Data
+def custom_rag_query(sensor_data):
+    weather_data = get_weather(sensor_data.get("location", "Bordeaux"))
+    forecast_data = get_forecast(sensor_data)
+    web_results = get_web_results("irrigation best practices")
+    
     external_context = f"""
     📡 **Current Sensor Data:**
-    - Sector: {iot_data.get("sector", "Unknown")}
-    - Soil Moisture: {iot_data.get("moisture", "N/A")}%
-    - Temperature: {iot_data.get("temperature", "N/A")}°C
+    - Sector: {sensor_data.get("sector", "Unknown")}
+    - Soil Moisture: {sensor_data.get("soil_moisture", "N/A")}%
+    - Temperature: {sensor_data.get("temperature", "N/A")}°C
+    - Humidity: {sensor_data.get("humidity", "N/A")}%
+    - Evapotranspiration: {sensor_data.get("evapotranspiration", "N/A")}
 
     🌦 **Current Weather:**
     - Temperature: {weather_data.get("temperature", "N/A")}°C
     - Humidity: {weather_data.get("humidity", "N/A")}%
     - Conditions: {weather_data.get("conditions", "N/A")}
 
-    🔙 **Past Weather Data (GAN Model):**
-    - Avg Temp: {past_weather.get("temp_avg", "N/A")}°C
-    - Avg Rain: {past_weather.get("rain_avg", "N/A")} mm
-    - Avg Humidity: {past_weather.get("humidity_avg", "N/A")}%
-
     🔮 **Forecast Data (GAN Prediction):**
-    - Predicted Temp: {forecast_data.get("temp_pred", "N/A")}°C
-    - Predicted Rain: {forecast_data.get("rain_pred", "N/A")} mm
-    - Predicted Humidity: {forecast_data.get("humidity_pred", "N/A")}%
+    - Predicted Irrigation: {forecast_data.get("predicted_irrigation", "N/A")}
+    - Sensor Data Used:
+      - Temperature: {forecast_data["sensor_data_used"].get("temperature", "N/A")}°C
+      - Humidity: {forecast_data["sensor_data_used"].get("humidity", "N/A")}%
+      - Soil Moisture: {forecast_data["sensor_data_used"].get("soil_moisture", "N/A")}%
+      - Solar Radiation: {forecast_data["sensor_data_used"].get("solar_radiation", "N/A")} W/m²
 
-    🚜 **Farmer's Question:** {user_query}
+    🚜 **Farmer's Query:** Should I water my vineyard today?
 
-    Provide an answer considering water policies, IoT data, weather trends, past records, and forecast predictions.
+    Provide an answer considering water policies, IoT data, weather trends, and forecast predictions.
     """
-
-    # Run query through RAG pipeline
+    
     response = qa_chain.run(external_context)
     return response
 
-# ✅ Step 8: Run Chatbot
+# ✅ Step 7: Start Kafka Consumer
 if __name__ == "__main__":
-    user_query = "Should I water my vineyard today?"
-    response = custom_rag_query(user_query)
-
-    print(f"👨‍🌾 Farmer: {user_query}")
-    print(f"🤖 AI: {response}")
+    consume_kafka_messages()

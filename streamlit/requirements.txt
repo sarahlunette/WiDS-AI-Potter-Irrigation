@@ -3,3 +3,6 @@ plotly
 plotly-express
 kafka-python
 pandas
+pypdf
+openai
+tiktoken

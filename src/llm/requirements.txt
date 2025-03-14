@@ -4,3 +4,5 @@ faiss-cpu
 pypdf
 unstructured
 requests
+kafka-python
+
