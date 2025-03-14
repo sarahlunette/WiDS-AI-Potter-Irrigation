@@ -6,3 +6,4 @@ pandas
 pypdf
 openai
 tiktoken
+transformers
