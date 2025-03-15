@@ -2,4 +2,11 @@ streamlit
 plotly
 plotly-express
 kafka-python
+pypdf
+openai
+tiktoken
+transformers
+sentence-transformers
+tf-keras
+accelerate>=0.26.0
 pandas

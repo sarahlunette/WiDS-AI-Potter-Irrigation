@@ -1,0 +1,8 @@
+rasterio
+pandas
+requests
+sentinelsat
+owslib
+pyet
+dotenv
+os
