@@ -36,6 +36,7 @@ def fetch_soil_data(lat, lon, bbox=None):
             bbox=bbox,
             resx=250,
             resy=250,
+
             format='GEOTIFF_INT16'
         )
 

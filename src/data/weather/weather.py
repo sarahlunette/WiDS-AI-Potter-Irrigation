@@ -12,6 +12,7 @@ def get_weather(lat, lon, API_KEY): # TODO: don't know if API_KEY should be a va
 
     current_response = requests.get(current_url)
     print(current_response)
+
     forecast_response = requests.get(forecast_url)
     
     if current_response.status_code == 200 and forecast_response.status_code == 200:

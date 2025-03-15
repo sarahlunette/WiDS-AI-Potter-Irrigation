@@ -40,6 +40,7 @@ def get_data(LOCATIONS):
         weather_owm = get_weather(lat, lon, API_KEY)
         # soil_data = fetch_soil_data(lat, lon, extension)
         evapotranspiration_data = fetch_evapotranspiration_data(weather_owm['current']['temperature'], lat) # TODO: add humidity in hargreaves calculation
+
         data_entry = {
             "location": name,
             "lat": lat,
@@ -55,5 +56,3 @@ def get_data(LOCATIONS):
     df = pd.DataFrame(all_data)
     # TODO: to DB
     return df
-
-get_data([{"lat": 48.8566, "lon": 2.3522, "name": "Paris", "extension": 5}])

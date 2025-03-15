@@ -1,5 +1,6 @@
 import numpy as np
 def compute_bbox(lat, lon, size_km=0.005):
+
     """
     Compute a bounding box for a field given its center coordinates and size.
     
