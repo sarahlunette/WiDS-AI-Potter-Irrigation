@@ -2,3 +2,4 @@ tokens
 .env
 streamlit/models_cache
 streamlit/vectorstore
+streamlit/model_/gemma
