@@ -10,9 +10,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from langchain_community.llms import HuggingFacePipeline
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
-from langchain.vectorstores import FAISS
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 # TODO: add historical irrigation data and decision and crop yields
@@ -28,13 +28,13 @@ st.set_page_config(page_title="Smart Irrigation AI Dashboard", layout="wide")
 
 # === Configuration ===
 KAFKA_BROKER = "localhost:9092"
-SENSOR_TOPIC = "sensor_data"
+SENSOR_TOPIC = "enriched_sensor_data"
 FORECAST_TOPIC = "forecast_data"
 COMMAND_TOPIC = "valve_commands"
 ENRICHED_DATA_TOPIC = "enriched_data_topic"
-VECTOR_DB_PATH = "./vectorstore/"  # Persistent FAISS storage
-PDF_FOLDER_PATH = "./data/llm/documents"
-MODEL_PATH = "./model_/gemma"  # Persistent model storage
+VECTOR_DB_PATH = "./vectorstore/index"  # Persistent FAISS storage
+PDF_FOLDER_PATH = "../data/llm/documents"
+MODEL_PATH = "./model_/gemma/"  # Persistent model storage
 
 # Ensure directories exist
 os.makedirs(VECTOR_DB_PATH, exist_ok=True)
@@ -50,8 +50,8 @@ def load_gemma_model():
         tokenizer = AutoTokenizer.from_pretrained(model_id)
         model = AutoModelForCausalLM.from_pretrained(
             model_id,
-            torch_dtype=torch.float16,
-            device_map="auto"
+            torch_dtype=torch.float32,
+            device_map="cpu"
         )
         tokenizer.save_pretrained(MODEL_PATH)
         model.save_pretrained(MODEL_PATH)
@@ -60,8 +60,8 @@ def load_gemma_model():
         tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
         model = AutoModelForCausalLM.from_pretrained(
             MODEL_PATH,
-            torch_dtype=torch.float16,
-            device_map="auto"
+            torch_dtype=torch.float32,
+            device_map="cpu"
         )
 
     return tokenizer, model
@@ -73,7 +73,7 @@ def load_pdfs_to_vectorstore(pdf_folder, vector_db_path):
     
     if os.path.exists(os.path.join(vector_db_path, "index")):
         print("🔄 Loading existing FAISS vector store...")
-        return FAISS.load_local(vector_db_path, embeddings)
+        return FAISS.load_local(vector_db_path, embeddings, allow_dangerous_deserialization=True)
 
     documents = []
     for pdf_file in os.listdir(pdf_folder):
@@ -99,7 +99,7 @@ hf_pipeline = pipeline(
     "text-generation",
     model=model,
     tokenizer=tokenizer,
-    torch_dtype=torch.float16,
+    torch_dtype=torch.float32,
     device_map="auto",
     max_new_tokens=100
 )
@@ -110,24 +110,25 @@ qa_chain = ConversationalRetrievalChain.from_llm(llm, vector_db.as_retriever(), 
 
 # === Custom RAG Query Function ===
 def custom_rag_query(sensor_data):
-    location = sensor_data.get("location", "Bordeaux")
-    weather_data = get_weather(location)
+    print(sensor_data)
+    lat = sensor_data.get('lat')
+    lon = sensor_data.get('lon')
+    weather_data = get_weather(lat, lon)
     forecast_data = generate_forecast(sensor_data)  # Assuming sensor_data is already enriched
-    web_results = get_web_results(f"Smart irrigation best practices in {location}")
+    # web_results = get_web_results(f"Smart irrigation best practices in {location}")
 
     query_input = {
         "question": f"""
         📡 **Sensor Data:** {sensor_data}
         🌦 **Weather:** {weather_data}
         🔮 **Forecast:** {forecast_data}
-        🔎 **Web Insights:** {web_results}
-        
+           
         Based on the above data, **output an irrigation control value between 1 (dry) and 10 (wet)**.
-        """,
+        """, # 🔎 **Web Insights:** {web_results}
         "chat_history": memory.load_memory_variables({}).get("history", [])
     }
     
-    response = qa_chain.run(query_input)
+    response = qa_chain.run(query_input["question"])
 
     try:
         return float(response.strip())  # Convert AI output to numerical value
@@ -187,5 +188,5 @@ elif page == "Chatbot":
     st.title("💬 AI Chatbot")
     user_input = st.text_input("Your question:")
     if st.button("Ask"):
-        response = custom_rag_query({"location": "Bordeaux", "sector": "Vineyard"})
+        response = custom_rag_query(user_input)
         st.write("🤖 AI Response:", response)
