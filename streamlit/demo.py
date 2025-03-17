@@ -99,6 +99,7 @@ def automated_decision_making():
 def custom_rag_query(sensor_data):
     weather_data = get_weather(sensor_data.get("location", "Bordeaux"))
     forecast_data = generate_forecast(sensor_data)
+    # add specific websearch on government website policies for instance (a watch on)
     # web_results = get_web_results("irrigation best practices")
     
     # Formulate the query input
