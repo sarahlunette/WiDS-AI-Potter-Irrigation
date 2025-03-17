@@ -99,7 +99,7 @@ def automated_decision_making():
 def custom_rag_query(sensor_data):
     weather_data = get_weather(sensor_data.get("location", "Bordeaux"))
     forecast_data = generate_forecast(sensor_data)
-    web_results = get_web_results("irrigation best practices")
+    # web_results = get_web_results("irrigation best practices")
     
     # Formulate the query input
     query_input = {
@@ -107,8 +107,7 @@ def custom_rag_query(sensor_data):
         📡 **Sensor Data:** {sensor_data}
         🌦 **Weather:** {weather_data}
         🔮 **Forecast:** {forecast_data}
-        🌍 **Web Insights:** {web_results[:3]}
-        """,
+        """, # 🌍 **Web Insights:** {web_results[:3]}
         "chat_history": memory.load_memory_variables({}).get("history", [])  # Ensure chat history is included
     }
     
