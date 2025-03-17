@@ -164,6 +164,7 @@ def automated_decision_making():
     
     for message in consumer:
         sensor_data = message.value
+
         control_value = process_sensor_data(sensor_data)  # AI-generated irrigation control level
         command = {"sector": sensor_data['sector'], "control_value": control_value}
         producer.send(COMMAND_TOPIC, command)
