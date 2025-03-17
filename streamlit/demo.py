@@ -4,6 +4,7 @@ import torch
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import threading
 from kafka import KafkaConsumer, KafkaProducer
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from langchain_community.llms import HuggingFacePipeline
@@ -13,8 +14,11 @@ from langchain.vectorstores import FAISS
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-import sys
 
+# TODO: add historical irrigation data and decision and crop yields
+
+# === Import Custom Functions ===
+import sys
 sys.path.append(os.path.abspath('..'))
 from src.websearch.search_engine import get_web_results  # Web search API
 from src.forecast.generate_forecast import generate_forecast  # GAN Forecasting
@@ -28,22 +32,38 @@ SENSOR_TOPIC = "sensor_data"
 FORECAST_TOPIC = "forecast_data"
 COMMAND_TOPIC = "valve_commands"
 ENRICHED_DATA_TOPIC = "enriched_data_topic"
-VECTOR_DB_PATH = "vectorstore/index"
-PDF_FOLDER_PATH = "../data/llm/documents"
+VECTOR_DB_PATH = "./vectorstore/"  # Persistent FAISS storage
+PDF_FOLDER_PATH = "./data/llm/documents"
+MODEL_PATH = "./model_/gemma"  # Persistent model storage
 
-# Ensure FAISS directory exists
+# Ensure directories exist
 os.makedirs(VECTOR_DB_PATH, exist_ok=True)
+os.makedirs(MODEL_PATH, exist_ok=True)
 
-# === Load Gemma Model ===
+# === Load Gemma Model (Persistent) ===
 @st.cache_resource()
 def load_gemma_model():
     model_id = "google/gemma-2b"
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        torch_dtype=torch.float16,
-        device_map="auto"
-    )
+    
+    if not os.path.exists(MODEL_PATH):
+        print("🆕 Downloading and saving Gemma model...")
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            torch_dtype=torch.float16,
+            device_map="auto"
+        )
+        tokenizer.save_pretrained(MODEL_PATH)
+        model.save_pretrained(MODEL_PATH)
+    else:
+        print("🔄 Loading saved Gemma model...")
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+        model = AutoModelForCausalLM.from_pretrained(
+            MODEL_PATH,
+            torch_dtype=torch.float16,
+            device_map="auto"
+        )
+
     return tokenizer, model
 
 # === Load PDFs into FAISS Vector Store (Persistent) ===
@@ -51,26 +71,22 @@ def load_gemma_model():
 def load_pdfs_to_vectorstore(pdf_folder, vector_db_path):
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     
-    # Load FAISS if it already exists
     if os.path.exists(os.path.join(vector_db_path, "index")):
         print("🔄 Loading existing FAISS vector store...")
         return FAISS.load_local(vector_db_path, embeddings)
 
-    # Otherwise, create a new FAISS index
     documents = []
     for pdf_file in os.listdir(pdf_folder):
         if pdf_file.endswith(".pdf"):
             pdf_loader = PyPDFLoader(os.path.join(pdf_folder, pdf_file))
             documents.extend(pdf_loader.load())
-    
+
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=100)
     texts = text_splitter.split_documents(documents)
 
     print("🆕 Creating new FAISS vector store...")
     vector_db = FAISS.from_documents(texts, embeddings)
-
-    # Save FAISS to disk
-    vector_db.save_local(vector_db_path)
+    vector_db.save_local(vector_db_path)  # Save FAISS to disk
     return vector_db
 
 # Initialize model and vector store
@@ -92,7 +108,34 @@ llm = HuggingFacePipeline(pipeline=hf_pipeline)
 # === Conversational AI Chain ===
 qa_chain = ConversationalRetrievalChain.from_llm(llm, vector_db.as_retriever(), memory=memory)
 
-# === Automated AI Agent ===
+# === Custom RAG Query Function ===
+def custom_rag_query(sensor_data):
+    location = sensor_data.get("location", "Bordeaux")
+    weather_data = get_weather(location)
+    forecast_data = generate_forecast(sensor_data)  # Assuming sensor_data is already enriched
+    web_results = get_web_results(f"Smart irrigation best practices in {location}")
+
+    query_input = {
+        "question": f"""
+        📡 **Sensor Data:** {sensor_data}
+        🌦 **Weather:** {weather_data}
+        🔮 **Forecast:** {forecast_data}
+        🔎 **Web Insights:** {web_results}
+        
+        Based on the above data, **output an irrigation control value between 1 (dry) and 10 (wet)**.
+        """,
+        "chat_history": memory.load_memory_variables({}).get("history", [])
+    }
+    
+    response = qa_chain.run(query_input)
+
+    try:
+        return float(response.strip())  # Convert AI output to numerical value
+    except ValueError:
+        print("⚠️ AI returned an invalid value, defaulting to 5")
+        return 5  # Default neutral value
+
+# === Automated AI Agent (Continuous Scale 1-10) ===
 def automated_decision_making():
     consumer = KafkaConsumer(
         SENSOR_TOPIC, bootstrap_servers=KAFKA_BROKER,
@@ -105,29 +148,18 @@ def automated_decision_making():
     
     for message in consumer:
         sensor_data = message.value
-        response = custom_rag_query(sensor_data)
-        
-        if sensor_data['soil_moisture'] < 30:  # Example rule
-            command = {"sector": sensor_data['sector'], "action": "open_valve"}
-            producer.send(COMMAND_TOPIC, command)
+        control_value = custom_rag_query(sensor_data)  # AI-generated irrigation control level
+        command = {"sector": sensor_data['sector'], "control_value": control_value}
+        producer.send(COMMAND_TOPIC, command)
+        print(f"✅ Sent control command: {command}")
 
-# === Custom RAG Query Function ===
-def custom_rag_query(sensor_data):
-    weather_data = get_weather(sensor_data.get("location", "Bordeaux"))
-    forecast_data = generate_forecast(sensor_data)
-    
-    # Formulate the query input
-    query_input = {
-        "question": f"""
-        📡 **Sensor Data:** {sensor_data}
-        🌦 **Weather:** {weather_data}
-        🔮 **Forecast:** {forecast_data}
-        """,
-        "chat_history": memory.load_memory_variables({}).get("history", [])
-    }
-    
-    response = qa_chain.run(query_input)
-    return response
+# === Run Kafka Consumer in Background Thread ===
+def run_kafka_consumer():
+    automated_decision_making()
+
+if "kafka_thread" not in st.session_state:
+    st.session_state.kafka_thread = threading.Thread(target=run_kafka_consumer, daemon=True)
+    st.session_state.kafka_thread.start()
 
 # === Streamlit App ===
 page = st.sidebar.selectbox("Select Page", ["Dashboard", "Weather", "Chatbot"])
@@ -137,6 +169,11 @@ if page == "Dashboard":
     consumer = KafkaConsumer(SENSOR_TOPIC, bootstrap_servers=KAFKA_BROKER, value_deserializer=lambda m: json.loads(m.decode("utf-8")))
     data = [message.value for message in consumer]
     df = pd.DataFrame(data)
+    
+    if not df.empty:
+        fig = px.line(df, x="timestamp", y="soil_moisture", title="Soil Moisture Over Time")
+        st.plotly_chart(fig)
+    
     st.dataframe(df)
 
 elif page == "Weather":
@@ -152,6 +189,3 @@ elif page == "Chatbot":
     if st.button("Ask"):
         response = custom_rag_query({"location": "Bordeaux", "sector": "Vineyard"})
         st.write("🤖 AI Response:", response)
-
-# Start automated agent
-automated_decision_making()
