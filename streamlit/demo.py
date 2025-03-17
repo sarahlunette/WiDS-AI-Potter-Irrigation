@@ -26,7 +26,7 @@ FORECAST_TOPIC = "forecast_data"
 COMMAND_TOPIC = "valve_commands"
 ENRICHED_DATA_TOPIC = "enriched_data_topic"
 VECTOR_DB_PATH = "vectorstore/index"
-PDF_FOLDER_PATH = "./data/llm/documents"
+PDF_FOLDER_PATH = "../data/llm/documents"
 
 # === Load Gemma Model ===
 @st.cache_resource()
