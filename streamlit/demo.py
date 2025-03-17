@@ -14,6 +14,7 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import sys
+
 sys.path.append(os.path.abspath('..'))
 from src.websearch.search_engine import get_web_results  # Web search API
 from src.forecast.generate_forecast import generate_forecast  # GAN Forecasting
@@ -30,6 +31,9 @@ ENRICHED_DATA_TOPIC = "enriched_data_topic"
 VECTOR_DB_PATH = "vectorstore/index"
 PDF_FOLDER_PATH = "../data/llm/documents"
 
+# Ensure FAISS directory exists
+os.makedirs(VECTOR_DB_PATH, exist_ok=True)
+
 # === Load Gemma Model ===
 @st.cache_resource()
 def load_gemma_model():
@@ -42,9 +46,17 @@ def load_gemma_model():
     )
     return tokenizer, model
 
-# === Load PDFs into FAISS Vector Store ===
+# === Load PDFs into FAISS Vector Store (Persistent) ===
 @st.cache_resource()
-def load_pdfs_to_vectorstore(pdf_folder):
+def load_pdfs_to_vectorstore(pdf_folder, vector_db_path):
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    
+    # Load FAISS if it already exists
+    if os.path.exists(os.path.join(vector_db_path, "index")):
+        print("🔄 Loading existing FAISS vector store...")
+        return FAISS.load_local(vector_db_path, embeddings)
+
+    # Otherwise, create a new FAISS index
     documents = []
     for pdf_file in os.listdir(pdf_folder):
         if pdf_file.endswith(".pdf"):
@@ -53,13 +65,17 @@ def load_pdfs_to_vectorstore(pdf_folder):
     
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=100)
     texts = text_splitter.split_documents(documents)
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+    print("🆕 Creating new FAISS vector store...")
     vector_db = FAISS.from_documents(texts, embeddings)
+
+    # Save FAISS to disk
+    vector_db.save_local(vector_db_path)
     return vector_db
 
 # Initialize model and vector store
 tokenizer, model = load_gemma_model()
-vector_db = load_pdfs_to_vectorstore(PDF_FOLDER_PATH)
+vector_db = load_pdfs_to_vectorstore(PDF_FOLDER_PATH, VECTOR_DB_PATH)
 memory = ConversationBufferMemory()
 
 # Create LLM pipeline
@@ -99,8 +115,6 @@ def automated_decision_making():
 def custom_rag_query(sensor_data):
     weather_data = get_weather(sensor_data.get("location", "Bordeaux"))
     forecast_data = generate_forecast(sensor_data)
-    # add specific websearch on government website policies for instance (a watch on)
-    # web_results = get_web_results("irrigation best practices")
     
     # Formulate the query input
     query_input = {
@@ -108,13 +122,12 @@ def custom_rag_query(sensor_data):
         📡 **Sensor Data:** {sensor_data}
         🌦 **Weather:** {weather_data}
         🔮 **Forecast:** {forecast_data}
-        """, # 🌍 **Web Insights:** {web_results[:3]}
-        "chat_history": memory.load_memory_variables({}).get("history", [])  # Ensure chat history is included
+        """,
+        "chat_history": memory.load_memory_variables({}).get("history", [])
     }
     
     response = qa_chain.run(query_input)
     return response
-
 
 # === Streamlit App ===
 page = st.sidebar.selectbox("Select Page", ["Dashboard", "Weather", "Chatbot"])
