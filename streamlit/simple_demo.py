@@ -47,15 +47,22 @@ def load_pdfs_to_vectorstore(pdf_folder, vector_db_path):
 # Initialize model and vector store
 tokenizer, model = load_model()
 vector_db = load_pdfs_to_vectorstore(PDF_FOLDER_PATH, VECTOR_DB_PATH)
-memory = ConversationBufferMemory()
+memory = ConversationBufferMemory(memory_key="chat_history", input_key="question")
 
 hf_pipeline = pipeline("text-generation", model=model, tokenizer=tokenizer, device_map="auto", max_new_tokens=100)
 llm = HuggingFacePipeline(pipeline=hf_pipeline)
-qa_chain = ConversationalRetrievalChain.from_llm(llm, vector_db.as_retriever(), memory=memory)
+qa_chain = ConversationalRetrievalChain.from_llm(
+    llm,
+    vector_db.as_retriever(),
+    memory=memory,
+)
 
 # === Streamlit Chatbot ===
 st.title("💬 PDF RAG Chatbot")
 user_input = st.text_input("Your question:")
 if st.button("Ask"):
-    response = qa_chain.invoke({"question": user_input, "chat_history": memory.load_memory_variables({}).get("history", [])})
+    response = qa_chain.invoke({
+        "question": user_input,
+        memory.memory_key: memory.load_memory_variables({}).get(memory.memory_key, [])
+    })
     st.write("🤖 AI Response:", response)

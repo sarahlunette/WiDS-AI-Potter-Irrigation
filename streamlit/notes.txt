@@ -1,0 +1,7 @@
+# from src.forecast.generate_forecast import generate_forecast  # GAN Forecasting
+# from src.llm.llm_rag_feed import get_weather  # Weather function
+    # weather_data = get_weather(location)
+    # forecast_data = generate_forecast(sensor_data) if sensor_data else "No sensor data provided.
+            #🔮 **Forecast:** {forecast_data}         🌦 **Weather:** {weather_data}
+        #, 
+        #

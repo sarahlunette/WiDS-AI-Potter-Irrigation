@@ -7,11 +7,11 @@ import plotly.express as px
 import threading
 from kafka import KafkaConsumer, KafkaProducer
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
-from langchain_community.llms import HuggingFacePipeline
+from langchain_huggingface import HuggingFacePipeline
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -21,8 +21,6 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 import sys
 sys.path.append(os.path.abspath('..'))
 from src.websearch.search_engine import get_web_results  # Web search API
-from src.forecast.generate_forecast import generate_forecast  # GAN Forecasting
-from src.llm.llm_rag_feed import get_weather  # Weather function
 
 st.set_page_config(page_title="Smart Irrigation AI Dashboard", layout="wide")
 
@@ -92,7 +90,7 @@ def load_pdfs_to_vectorstore(pdf_folder, vector_db_path):
 # Initialize model and vector store
 tokenizer, model = load_gemma_model()
 vector_db = load_pdfs_to_vectorstore(PDF_FOLDER_PATH, VECTOR_DB_PATH)
-memory = ConversationBufferMemory()
+memory = ConversationBufferMemory(memory_key="chat_history", input_key="question")
 
 # Create LLM pipeline
 hf_pipeline = pipeline(
@@ -104,31 +102,43 @@ hf_pipeline = pipeline(
     max_new_tokens=100
 )
 llm = HuggingFacePipeline(pipeline=hf_pipeline)
+print(hf_pipeline("Test d'inférence avec Gemma"))
 
 # === Conversational AI Chain ===
 qa_chain = ConversationalRetrievalChain.from_llm(llm, vector_db.as_retriever(), memory=memory)
+print(vector_db)
+print(vector_db.as_retriever())
 
 # === Custom RAG Query Function (For Questions & Sensor Data) ===
 def custom_rag_query(question, sensor_data=None):
     location = sensor_data.get("location", "Bordeaux") if sensor_data else "Bordeaux"
-    weather_data = get_weather(location)
-    forecast_data = generate_forecast(sensor_data) if sensor_data else "No sensor data provided."
-    
+
+    # Prepare the chat history, ensure it's in the correct format (list of tuples)
+    chat_history = memory.load_memory_variables({}).get("history", [])
+
+    # Ensure chat_history is a list of tuples like [(user_input, bot_response), ...]
+    if not isinstance(chat_history, list):
+        chat_history = []
+
+    # Create the query input
     query_input = {
         "question": f"""
         📝 **User Question:** {question}
         📡 **Sensor Data:** {sensor_data if sensor_data else 'N/A'}
-        🌦 **Weather:** {weather_data}
-        🔮 **Forecast:** {forecast_data}
         """,
-        "chat_history": memory.load_memory_variables({}).get("history", [])
+        "chat_history": chat_history  # Correctly formatted chat history
     }
     
-    response = qa_chain.run(query_input)
+    print(f"Query Input: {query_input}")  # For debugging purposes
+
+    # Run the query using the ConversationalRetrievalChain
+    response = qa_chain.invoke(query_input)
+    print(f"AI Response: {response}")  # For debugging purposes
     return response
 
+
 # === Sensor Data Processing Function (For Dashboard) ===
-def process_sensor_data(sensor_data):
+'''def process_sensor_data(sensor_data):
     location = sensor_data.get("location", "Bordeaux")
     weather_data = get_weather(location)
     forecast_data = generate_forecast(sensor_data)  # Assuming sensor_data is already enriched
@@ -168,7 +178,7 @@ def automated_decision_making():
         control_value = process_sensor_data(sensor_data)  # AI-generated irrigation control level
         command = {"sector": sensor_data['sector'], "control_value": control_value}
         producer.send(COMMAND_TOPIC, command)
-        print(f"✅ Sent control command: {command}")
+        print(f"✅ Sent control command: {command}")'''
 
 # === Streamlit App ===
 page = st.sidebar.selectbox("Select Page", ["Dashboard", "Weather", "Chatbot"])
